@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Votación de Academia — Presidente y Secretario</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js para gráficas de pastel en tiempo real -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Fuente Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+    }
+    .candidate-card {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .candidate-card:hover {
+      transform: translateY(-2px);
+    }
+    input[type="radio"]:checked + .candidate-card {
+      border-color: #1d4ed8;
+      background-color: #eff6ff;
+      box-shadow: 0 4px 12px -2px rgba(29, 78, 216, 0.15);
+    }
+    input[type="radio"]:checked + .candidate-card .radio-circle {
+      border-color: #1d4ed8;
+      background-color: #1d4ed8;
+    }
+    input[type="radio"]:checked + .candidate-card .radio-dot {
+      opacity: 1;
+      transform: scale(1);
+    }
+    input[type="radio"]:disabled + .candidate-card {
+      opacity: 0.45;
+      cursor: not-allowed;
+      background-color: #f1f5f9;
+      transform: none;
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Encabezado Institucional -->
+  <header class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-lg">
+    <div class="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-200 border border-blue-400/30 mb-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Proceso Electoral Interno
+          </span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            Elección de Mesa Directiva de Academia
+          </h1>
+          <p class="mt-1.5 text-sm sm:text-base text-slate-300">
+            Renovación de los cargos de <strong>Presidente</strong> y <strong>Secretario</strong> de Academia
+          </p>
+        </div>
+        <div class="bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-3 text-xs text-slate-200 shrink-0">
+          <div class="font-semibold text-white mb-0.5">Estado del Sistema</div>
+          <div class="flex items-center gap-1.5 text-emerald-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Conectado a Google Sheets
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido Principal -->
+  <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+
+    <!-- Alerta de Voto Ya Emitido en este Navegador -->
+    <div id="alreadyVotedBanner" class="hidden bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-xl shadow-sm">
+      <div class="flex items-start gap-3">
+        <svg class="w-6 h-6 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <div class="flex-1">
+          <h3 class="text-sm font-bold text-amber-900">Ya se registró un voto desde este dispositivo</h3>
+          <p class="text-sm text-amber-800 mt-1">
+            Para mantener la integridad de la elección, se limita a un voto por navegador. Si otro docente necesita votar desde este mismo equipo, puedes habilitar una nueva boleta.
+          </p>
+          <button type="button" onclick="resetVoterSession()" class="mt-3 inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition cursor-pointer">
+            Habilitar boleta para otro votante
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulario de Votación -->
+    <form id="votingForm" class="space-y-8" novalidate>
+
+      <!-- Paso 1: Identificación del Votante -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm shrink-0">1</span>
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">Identificación del Docente Votante</h2>
+            <p class="text-xs text-slate-500">Ingresa tu nombre completo o correo institucional para validar tu participación.</p>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <label for="voterName" class="block text-sm font-semibold text-slate-700 mb-1.5">
+            Nombre completo o Correo Institucional <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="voterName"
+            name="voterName"
+            required
+            placeholder="Ej. Dr. Juan Pérez López / juan.perez@institucion.edu.mx"
+            class="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+          />
+          <p id="voterError" class="hidden mt-1.5 text-xs font-medium text-red-600">
+            Por favor ingresa tu nombre o correo institucional antes de continuar.
+          </p>
+        </div>
+      </section>
+
+      <!-- Paso 2: Selección de Presidente de Academia -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8">
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm shrink-0">2</span>
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">Presidente de Academia</h2>
+              <p class="text-xs text-slate-500">Selecciona una (1) opción para ocupar la Presidencia.</p>
+            </div>
+          </div>
+          <span class="hidden sm:inline-block text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">
+            Requerido
+          </span>
+        </div>
+
+        <div id="presidentCandidates" class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-5">
+          <!-- Renderizado dinámico por JS -->
+        </div>
+        <p id="presidentError" class="hidden mt-3 text-xs font-medium text-red-600">
+          Debes seleccionar un candidato para Presidente de Academia.
+        </p>
+      </section>
+
+      <!-- Paso 3: Selección de Secretario de Academia -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8">
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm shrink-0">3</span>
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">Secretario de Academia</h2>
+              <p class="text-xs text-slate-500">Selecciona una (1) opción distinta a la elegida para Presidente.</p>
+            </div>
+          </div>
+          <span class="hidden sm:inline-block text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">
+            Requerido
+          </span>
+        </div>
+
+        <div id="secretaryCandidates" class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-5">
+          <!-- Renderizado dinámico por JS -->
+        </div>
+        <p id="secretaryError" class="hidden mt-3 text-xs font-medium text-red-600">
+          Debes seleccionar un candidato para Secretario de Academia.
+        </p>
+      </section>
+
+      <!-- Botón de Envío -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+        <p class="text-xs text-slate-500 text-center sm:text-left">
+          Al confirmar, tu voto será registrado directamente en el formulario oficial y almacenado en Google Sheets.
+        </p>
+        <button
+          type="submit"
+          id="submitBtn"
+          class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>Revisar y Emitir Voto</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+        </button>
+      </div>
+    </form>
+
+    <!-- Pantalla de Confirmación / Recibo tras Enviar -->
+    <div id="successCard" class="hidden bg-white rounded-2xl shadow-md border border-emerald-200 p-8 text-center space-y-5">
+      <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+        <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+      </div>
+      <div>
+        <h2 class="text-2xl font-extrabold text-slate-900">¡Voto Registrado Exitosamente!</h2>
+        <p class="text-sm text-slate-600 mt-1">Tu participación ha sido enviada a Google Forms y sincronizada con Google Sheets.</p>
+      </div>
+
+      <div class="max-w-md mx-auto bg-slate-50 rounded-xl p-4 border border-slate-200 text-left text-sm space-y-2">
+        <div class="flex justify-between gap-2">
+          <span class="text-slate-500">Votante:</span>
+          <span id="receiptVoter" class="font-semibold text-slate-900 text-right"></span>
+        </div>
+        <div class="flex justify-between gap-2">
+          <span class="text-slate-500">Presidente:</span>
+          <span id="receiptPresident" class="font-semibold text-blue-700 text-right"></span>
+        </div>
+        <div class="flex justify-between gap-2">
+          <span class="text-slate-500">Secretario:</span>
+          <span id="receiptSecretary" class="font-semibold text-blue-700 text-right"></span>
+        </div>
+        <div class="flex justify-between gap-2 pt-2 border-t border-slate-200 text-xs text-slate-400">
+          <span>Folio / Hora:</span>
+          <span id="receiptTime"></span>
+        </div>
+      </div>
+
+      <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <button type="button" onclick="resetVoterSession()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer">
+          Realizar otro registro
+        </button>
+        <a id="fallbackFormLink" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition">
+          Verificar / Enviar respaldo directo en Google Forms
+        </a>
+      </div>
+    </div>
+
+    <!-- Sección de Resultados Preliminares (Gráficas de Pastel) -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Conteo en Tiempo Real</span>
+          <h2 class="text-xl font-extrabold text-slate-900 mt-0.5">Resultados Preliminares de la Votación</h2>
+          <p class="text-xs text-slate-500 mt-1">
+            Lectura automática desde la hoja de cálculo oficial de Google Sheets.
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="totalVotesBadge" class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs border border-blue-100">
+            Total de votos: 0
+          </span>
+          <button
+            type="button"
+            onclick="fetchSheetResults()"
+            id="refreshChartBtn"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
+          >
+            <svg id="refreshIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Actualizar Gráficas
+          </button>
+        </div>
+      </div>
+
+      <div id="chartStatusMsg" class="mt-4 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+        <span>Sincronizando datos con Google Sheets...</span>
+        <span id="lastUpdatedTime"></span>
+      </div>
+
+      <!-- Grid de Gráficas de Pastel -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+        <!-- Gráfica Presidente -->
+        <div class="bg-slate-50/70 rounded-xl p-5 border border-slate-200/70 flex flex-col items-center">
+          <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide mb-2">Presidente de Academia</h3>
+          <div id="leaderPresident" class="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full mb-4 text-center">
+            Esperando votos...
+          </div>
+          <div class="relative w-full max-w-[270px] aspect-square">
+            <canvas id="presidentChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfica Secretario -->
+        <div class="bg-slate-50/70 rounded-xl p-5 border border-slate-200/70 flex flex-col items-center">
+          <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide mb-2">Secretario de Academia</h3>
+          <div id="leaderSecretary" class="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full mb-4 text-center">
+            Esperando votos...
+          </div>
+          <div class="relative w-full max-w-[270px] aspect-square">
+            <canvas id="secretaryChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal de Confirmación antes de Enviar -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+      <div>
+        <h3 class="text-lg font-extrabold text-slate-900">Confirmar Elección</h3>
+        <p class="text-xs text-slate-500 mt-1">Verifica tu selección antes de enviarla a Google Sheets. Una vez enviada no se puede modificar.</p>
+      </div>
+
+      <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3 text-sm">
+        <div>
+          <span class="text-xs text-slate-400 block">Votante</span>
+          <span id="modalVoter" class="font-bold text-slate-800"></span>
+        </div>
+        <div class="border-t border-slate-200 pt-2">
+          <span class="text-xs text-slate-400 block">Presidente de Academia</span>
+          <span id="modalPresident" class="font-bold text-blue-700"></span>
+        </div>
+        <div class="border-t border-slate-200 pt-2">
+          <span class="text-xs text-slate-400 block">Secretario de Academia</span>
+          <span id="modalSecretary" class="font-bold text-blue-700"></span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" onclick="closeConfirmModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition cursor-pointer">
+          Corregir
+        </button>
+        <button type="button" id="confirmSendBtn" onclick="executeVoteSubmission()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer">
+          <span>Confirmar y Enviar Voto</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pie de Página -->
+  <footer class="bg-white border-t border-slate-200 mt-12">
+    <div class="max-w-4xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <div>
+        Sistema de Votación Académica • Alojado en GitHub Pages
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="https://docs.google.com/spreadsheets/d/1v973mOlXjy-OhzWdW5_ssRcAFKYS0gL7A1GlU01wqS8/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline font-medium">
+          Abrir Hoja de Resultados (Google Sheets)
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Iframe oculto para envío infalible a Google Forms sin redirección -->
+  <iframe name="hidden_gform_iframe" id="hidden_gform_iframe" style="display:none;"></iframe>
+
+  <script>
+    // =========================================================================
+    // CONFIGURACIÓN DE GOOGLE FORMS Y GOOGLE SHEETS
+    // =========================================================================
+    const GOOGLE_CONFIG = {
+      formActionUrl: "https://docs.google.com/forms/d/e/1FAIpQLScVOasyzBuB02VsoD7ywDb68ufDkKgvk8Ife5LDOF9XpzJF9A/formResponse",
+      formViewUrl: "https://docs.google.com/forms/d/e/1FAIpQLScVOasyzBuB02VsoD7ywDb68ufDkKgvk8Ife5LDOF9XpzJF9A/viewform",
+      entries: {
+        voter: "entry.408156092",
+        president: "entry.1740427236",
+        secretary: "entry.485106907"
+      },
+      sheetId: "1v973mOlXjy-OhzWdW5_ssRcAFKYS0gL7A1GlU01wqS8"
+    };
+
+    const CANDIDATES = [
+      "Saúl García Andazola",
+      "Luis Alberto Grijalva Romero",
+      "Janet Angelica Grijalva Ruiz",
+      "Lilia Margarita Mena Castillo",
+      "Gerardo Lechuga Rascón",
+      "Isaac Neftali Molina Cepeda",
+      "Mayra Zuleika Bencomo Trejo"
+    ];
+
+    const CHART_COLORS = [
+      "#1d4ed8", // Azul fuerte
+      "#059669", // Esmeralda
+      "#d97706", // Ámbar
+      "#7c3aed", // Violeta
+      "#db2777", // Rosa
+      "#0891b2", // Cian
+      "#dc2626"  // Rojo
+    ];
+
+    let presidentChartInstance = null;
+    let secretaryChartInstance = null;
+
+    // =========================================================================
+    // INICIALIZACIÓN DE INTERFAZ Y CANDIDATOS
+    // =========================================================================
+    document.addEventListener("DOMContentLoaded", () => {
+      renderCandidateOptions("presidentCandidates", "president");
+      renderCandidateOptions("secretaryCandidates", "secretary");
+      checkExistingVote();
+      fetchSheetResults();
+    });
+
+    function getInitials(name) {
+      const parts = name.trim().split(" ");
+      if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+
+    function renderCandidateOptions(containerId, roleName) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = CANDIDATES.map((candidate, idx) => {
+        const inputId = `${roleName}_${idx}`;
+        return `
+          <label for="${inputId}" class="relative block cursor-pointer">
+            <input
+              type="radio"
+              id="${inputId}"
+              name="${roleName}"
+              value="${candidate}"
+              class="sr-only"
+              onchange="handleRoleSelectionChange()"
+            />
+            <div class="candidate-card flex items-center gap-3.5 p-4 rounded-xl border-2 border-slate-200 bg-white">
+              <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                ${getInitials(candidate)}
+              </div>
+              <div class="flex-grow min-w-0">
+                <p class="text-sm font-semibold text-slate-900 leading-snug">${candidate}</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">Candidato(a) registrado(a)</p>
+              </div>
+              <div class="radio-circle w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center shrink-0 transition">
+                <div class="radio-dot w-2 h-2 rounded-full bg-white opacity-0 scale-50 transition"></div>
+              </div>
+            </div>
+          </label>
+        `;
+      }).join("");
+    }
+
+    // Evitar que la misma persona sea seleccionada para Presidente y Secretario a la vez
+    function handleRoleSelectionChange() {
+      const selectedPresident = document.querySelector('input[name="president"]:checked')?.value || "";
+      const selectedSecretary = document.querySelector('input[name="secretary"]:checked')?.value || "";
+
+      document.querySelectorAll('input[name="secretary"]').forEach(input => {
+        input.disabled = (input.value === selectedPresident && selectedPresident !== "");
+      });
+
+      document.querySelectorAll('input[name="president"]').forEach(input => {
+        input.disabled = (input.value === selectedSecretary && selectedSecretary !== "");
+      });
+
+      document.getElementById("presidentError").classList.add("hidden");
+      document.getElementById("secretaryError").classList.add("hidden");
+    }
+
+    // =========================================================================
+    // VALIDACIÓN Y MODAL DE CONFIRMACIÓN
+    // =========================================================================
+    document.getElementById("votingForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const voterName = document.getElementById("voterName").value.trim();
+      const president = document.querySelector('input[name="president"]:checked')?.value;
+      const secretary = document.querySelector('input[name="secretary"]:checked')?.value;
+
+      let hasError = false;
+
+      if (!voterName) {
+        document.getElementById("voterError").classList.remove("hidden");
+        hasError = true;
+      } else {
+        document.getElementById("voterError").classList.add("hidden");
+      }
+
+      if (!president) {
+        document.getElementById("presidentError").classList.remove("hidden");
+        hasError = true;
+      } else {
+        document.getElementById("presidentError").classList.add("hidden");
+      }
+
+      if (!secretary) {
+        document.getElementById("secretaryError").classList.remove("hidden");
+        hasError = true;
+      } else {
+        document.getElementById("secretaryError").classList.add("hidden");
+      }
+
+      if (hasError) return;
+
+      document.getElementById("modalVoter").textContent = voterName;
+      document.getElementById("modalPresident").textContent = president;
+      document.getElementById("modalSecretary").textContent = secretary;
+      document.getElementById("confirmModal").classList.remove("hidden");
+    });
+
+    function closeConfirmModal() {
+      document.getElementById("confirmModal").classList.add("hidden");
+    }
+
+    // =========================================================================
+    // ENVÍO REAL A GOOGLE FORMS VÍA FORMULARIO HTML + IFRAME OCULTO
+    // =========================================================================
+    function executeVoteSubmission() {
+      const voterName = document.getElementById("voterName").value.trim();
+      const president = document.querySelector('input[name="president"]:checked')?.value;
+      const secretary = document.querySelector('input[name="secretary"]:checked')?.value;
+
+      const confirmBtn = document.getElementById("confirmSendBtn");
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = `<span>Enviando voto...</span>`;
+
+      // Construir formulario dinámico apuntando al iframe oculto
+      const hiddenForm = document.createElement("form");
+      hiddenForm.method = "POST";
+      hiddenForm.action = GOOGLE_CONFIG.formActionUrl;
+      hiddenForm.target = "hidden_gform_iframe";
+      hiddenForm.style.display = "none";
+
+      const fields = {
+        [GOOGLE_CONFIG.entries.voter]: voterName,
+        [GOOGLE_CONFIG.entries.president]: president,
+        [GOOGLE_CONFIG.entries.secretary]: secretary,
+        "fvv": "1",
+        "pageHistory": "0"
+      };
+
+      for (const [key, val] of Object.entries(fields)) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = val;
+        hiddenForm.appendChild(input);
+      }
+
+      document.body.appendChild(hiddenForm);
+      hiddenForm.submit();
+      document.body.removeChild(hiddenForm);
+
+      // Generar enlace prellenado de respaldo por si el usuario desea verificar
+      const prefilledUrl = `${GOOGLE_CONFIG.formViewUrl}?usp=pp_url&${GOOGLE_CONFIG.entries.voter}=${encodeURIComponent(voterName)}&${GOOGLE_CONFIG.entries.president}=${encodeURIComponent(president)}&${GOOGLE_CONFIG.entries.secretary}=${encodeURIComponent(secretary)}`;
+      document.getElementById("fallbackFormLink").href = prefilledUrl;
+
+      setTimeout(() => {
+        closeConfirmModal();
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = `<span>Confirmar y Enviar Voto</span>`;
+
+        const timestamp = new Date().toLocaleString("es-MX");
+        localStorage.setItem("academia_voto_registrado", JSON.stringify({
+          voter: voterName,
+          president,
+          secretary,
+          time: timestamp
+        }));
+
+        showSuccessReceipt(voterName, president, secretary, timestamp);
+
+        // Actualizar gráficas de pastel 2 segundos después de guardar
+        setTimeout(() => {
+          fetchSheetResults();
+        }, 2000);
+      }, 900);
+    }
+
+    function showSuccessReceipt(voter, president, secretary, time) {
+      document.getElementById("votingForm").classList.add("hidden");
+      document.getElementById("alreadyVotedBanner").classList.add("hidden");
+      document.getElementById("successCard").classList.remove("hidden");
+
+      document.getElementById("receiptVoter").textContent = voter;
+      document.getElementById("receiptPresident").textContent = president;
+      document.getElementById("receiptSecretary").textContent = secretary;
+      document.getElementById("receiptTime").textContent = time;
+    }
+
+    function checkExistingVote() {
+      const saved = localStorage.getItem("academia_voto_registrado");
+      if (saved) {
+        document.getElementById("alreadyVotedBanner").classList.remove("hidden");
+      }
+    }
+
+    function resetVoterSession() {
+      localStorage.removeItem("academia_voto_registrado");
+      document.getElementById("votingForm").reset();
+      document.querySelectorAll('input[type="radio"]').forEach(r => r.disabled = false);
+      document.getElementById("successCard").classList.add("hidden");
+      document.getElementById("alreadyVotedBanner").classList.add("hidden");
+      document.getElementById("votingForm").classList.remove("hidden");
+    }
+
+    // =========================================================================
+    // LECTURA DE GOOGLE SHEETS Y GRÁFICAS DE PASTEL (CHART.JS)
+    // =========================================================================
+    async function fetchSheetResults() {
+      const statusEl = document.getElementById("chartStatusMsg").firstElementChild;
+      const refreshIcon = document.getElementById("refreshIcon");
+      refreshIcon.classList.add("animate-spin");
+      statusEl.textContent = "Consultando respuestas en Google Sheets...";
+
+      const gvizUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_CONFIG.sheetId}/gviz/tq?tqx=out:json`;
+
+      try {
+        const response = await fetch(gvizUrl);
+        const text = await response.text();
+        // Extraer JSON limpio de la respuesta de Google Visualization API
+        const jsonStr = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
+        const data = JSON.parse(jsonStr);
+
+        const rows = data.table.rows || [];
+        const presidentCounts = {};
+        const secretaryCounts = {};
+
+        CANDIDATES.forEach(c => {
+          presidentCounts[c] = 0;
+          secretaryCounts[c] = 0;
+        });
+
+        let validVotes = 0;
+
+        rows.forEach(row => {
+          const cells = row.c || [];
+          // Columnas típicas de Google Forms: [0]=Marca temporal, [1]=Votante, [2]=Presidente, [3]=Secretario
+          const presVal = cells[2]?.v ? String(cells[2].v).trim() : "";
+          const secVal = cells[3]?.v ? String(cells[3].v).trim() : "";
+
+          if (presVal || secVal) {
+            validVotes++;
+            if (Object.prototype.hasOwnProperty.call(presidentCounts, presVal)) {
+              presidentCounts[presVal]++;
+            } else if (presVal) {
+              presidentCounts[presVal] = (presidentCounts[presVal] || 0) + 1;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(secretaryCounts, secVal)) {
+              secretaryCounts[secVal]++;
+            } else if (secVal) {
+              secretaryCounts[secVal] = (secretaryCounts[secVal] || 0) + 1;
+            }
+          }
+        });
+
+        document.getElementById("totalVotesBadge").textContent = `Total de votos: ${validVotes}`;
+        statusEl.textContent = validVotes > 0
+          ? "Resultados actualizados correctamente desde Google Sheets."
+          : "Aún no hay votos registrados en la hoja de cálculo.";
+        document.getElementById("lastUpdatedTime").textContent = `Última lectura: ${new Date().toLocaleTimeString("es-MX")}`;
+
+        updatePieCharts(presidentCounts, secretaryCounts, validVotes);
+      } catch (err) {
+        console.error("Error leyendo Google Sheets:", err);
+        statusEl.textContent = "No se pudo leer el Google Sheets (verifica que el enlace esté compartido como Lector).";
+        updatePieCharts({}, {}, 0);
+      } finally {
+        refreshIcon.classList.remove("animate-spin");
+      }
+    }
+
+    function getLeaderText(counts, totalVotes) {
+      if (totalVotes === 0) return "Sin votos registrados aún";
+      let maxVotes = 0;
+      let leaders = [];
+
+      for (const [name, count] of Object.entries(counts)) {
+        if (count > maxVotes) {
+          maxVotes = count;
+          leaders = [name];
+        } else if (count === maxVotes && count > 0) {
+          leaders.push(name);
+        }
+      }
+
+      if (maxVotes === 0) return "Sin votos registrados aún";
+      const pct = ((maxVotes / totalVotes) * 100).toFixed(1);
+      if (leaders.length > 1) {
+        return `Empate (${maxVotes} votos • ${pct}%): ${leaders.join(" y ")}`;
+      }
+      return `Puntero: ${leaders[0]} (${maxVotes} votos • ${pct}%)`;
+    }
+
+    function updatePieCharts(presidentCounts, secretaryCounts, totalVotes) {
+      const labels = Object.keys(presidentCounts).length ? Object.keys(presidentCounts) : CANDIDATES;
+      const presData = labels.map(l => presidentCounts[l] || 0);
+      const secData = labels.map(l => secretaryCounts[l] || 0);
+
+      document.getElementById("leaderPresident").textContent = getLeaderText(presidentCounts, totalVotes);
+      document.getElementById("leaderSecretary").textContent = getLeaderText(secretaryCounts, totalVotes);
+
+      const hasData = totalVotes > 0;
+      const chartLabels = hasData ? labels : ["Sin votos aún"];
+      const chartColors = hasData ? CHART_COLORS : ["#e2e8f0"];
+
+      const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              boxWidth: 12,
+              font: { size: 11, family: "Inter" },
+              padding: 12
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                if (!hasData) return " 0 votos (0%)";
+                const val = ctx.raw || 0;
+                const pct = totalVotes > 0 ? ((val / totalVotes) * 100).toFixed(1) : 0;
+                return ` ${ctx.label}: ${val} voto(s) (${pct}%)`;
+              }
+            }
+          }
+        }
+      };
+
+      // Gráfica Presidente
+      const presCtx = document.getElementById("presidentChart").getContext("2d");
+      if (presidentChartInstance) presidentChartInstance.destroy();
+      presidentChartInstance = new Chart(presCtx, {
+        type: "pie",
+        data: {
+          labels: chartLabels,
+          datasets: [{
+            data: hasData ? presData : [1],
+            backgroundColor: chartColors,
+            borderWidth: 2,
+            borderColor: "#ffffff"
+          }]
+        },
+        options: commonOptions
+      });
+
+      // Gráfica Secretario
+      const secCtx = document.getElementById("secretaryChart").getContext("2d");
+      if (secretaryChartInstance) secretaryChartInstance.destroy();
+      secretaryChartInstance = new Chart(secCtx, {
+        type: "pie",
+        data: {
+          labels: chartLabels,
+          datasets: [{
+            data: hasData ? secData : [1],
+            backgroundColor: chartColors,
+            borderWidth: 2,
+            borderColor: "#ffffff"
+          }]
+        },
+        options: commonOptions
+      });
+    }
+  </script>
+</body>
+</html>
