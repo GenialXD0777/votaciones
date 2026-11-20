@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Votación de Academia - Cambio de Mesa Directiva</title>
+    <!-- Tailwind CSS para diseño moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Iconos de Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Fuente Inter de Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Estilos personalizados para las tarjetas de selección */
+        .candidate-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .candidate-card:hover {
+            transform: translateY(-2px);
+        }
+        input[type="radio"]:checked + .candidate-card {
+            border-color: #2563eb;
+            background-color: #eff6ff;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06);
+        }
+        input[type="radio"]:checked + .candidate-card .check-circle {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+        input[type="radio"]:checked + .candidate-card .check-icon {
+            opacity: 1;
+            transform: scale(1);
+        }
+        input[type="radio"]:disabled + .candidate-card {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #f9fafb;
+            transform: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-800 antialiased">
+
+    <!-- =====================================================================
+         CONFIGURACIÓN DE CONEXIÓN CON GOOGLE FORMS
+         (Modifica los valores aquí abajo cuando tengas tu formulario listo)
+         ===================================================================== -->
+    <script>
+        const GOOGLE_FORM_CONFIG = {
+            // 1. URL de acción oficial de tu Google Form (termina en /formResponse)
+            formActionUrl: "https://docs.google.com/forms/d/e/1FAIpQLScVOasyzBuB02VsoD7ywDb68ufDkKgvk8Ife5LDOF9XpzJF9A/formResponse",
+
+            // 2. IDs exactos de cada pregunta obtenidos de tu formulario
+            entries: {
+                voterId: "entry.408156092",    // Campo para Votante (DATO1)
+                president: "entry.1740427236", // Campo para Presidente de Academia (DATO2)
+                secretary: "entry.485106907"   // Campo para Secretario de Academia (DATO3)
+            },
+
+            // Lista oficial de candidatos
+            candidates: [
+                "Saúl García Andazola",
+                "Luis Alberto Grijalva Romero",
+                "Janet Angelica Grijalva Ruiz",
+                "Lilia Margarita Mena Castillo",
+                "Gerardo Lechuga Rascón",
+                "Isaac Neftali Molina Cepeda",
+                "Mayra Zuleika Bencomo Trejo"
+            ],
+
+            // Evitar múltiples votos desde el mismo navegador (true = activado, false = desactivado para pruebas)
+            preventDuplicateVotes: true
+        };
+    </script>
+
+    <!-- Encabezado Institucional -->
+    <header class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4 text-center sm:text-left">
+                <div class="p-3 bg-blue-600/20 border border-blue-400/30 rounded-xl backdrop-blur-sm">
+                    <i data-lucide="vote" class="w-8 h-8 text-blue-400"></i>
+                </div>
+                <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-blue-300">Proceso Electoral Interno</span>
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight mt-0.5">Renovación de Academia</h1>
+                    <p class="text-sm text-slate-300 mt-1">Elección de Presidente y Secretario de Academia</p>
+                </div>
+            </div>
+            <div class="hidden md:flex items-center gap-2 text-xs bg-white/10 px-3.5 py-2 rounded-full border border-white/10">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Urna Digital Activa</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+
+        <!-- Alerta de Modo Prueba (Se oculta automáticamente cuando configuras tu URL real) -->
+        <div id="demo-banner" class="hidden mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm">
+            <div class="flex items-start gap-3">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i>
+                <div class="text-sm text-amber-800">
+                    <p class="font-semibold">Modo de Vista Previa / Sin Conectar</p>
+                    <p class="mt-1">Aún no has configurado la URL de tu Google Form en el código. El formulario validará las selecciones pero simulará el envío hasta que coloques tus datos de Google Forms.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notificación de Error / Validación -->
+        <div id="error-toast" class="hidden mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3.5 rounded-xl shadow-sm flex items-center justify-between transition-all">
+            <div class="flex items-center gap-3">
+                <i data-lucide="alert-circle" class="w-5 h-5 text-red-600 shrink-0"></i>
+                <span id="error-message" class="text-sm font-medium">Por favor completa todos los campos requeridos.</span>
+            </div>
+            <button type="button" onclick="hideError()" class="text-red-500 hover:text-red-700">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Pantalla de Voto Ya Registrado -->
+        <div id="already-voted-screen" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5">
+                <i data-lucide="check-circle-2" class="w-9 h-9"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900">¡Tu voto ha sido registrado!</h2>
+            <p class="text-slate-600 mt-2 max-w-md mx-auto">
+                Gracias por participar en el proceso de elección para el cambio de Presidente y Secretario de Academia. Tus respuestas han sido enviadas correctamente.
+            </p>
+            
+            <div id="vote-receipt" class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4 max-w-md mx-auto text-left text-sm space-y-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-200 pb-1.5">Resumen de participación</p>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Docente / Votante:</span>
+                    <span id="receipt-voter" class="font-medium text-slate-800">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Presidente elegido:</span>
+                    <span id="receipt-president" class="font-medium text-blue-700">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Secretario elegido:</span>
+                    <span id="receipt-secretary" class="font-medium text-blue-700">-</span>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <button type="button" onclick="resetVoteForTesting()" class="text-xs text-slate-400 hover:text-slate-600 underline">
+                    Realizar otro registro (Solo para pruebas o equipos compartidos)
+                </button>
+            </div>
+        </div>
+
+        <!-- Formulario Principal de Votación -->
+        <form id="voting-form" class="space-y-8" novalidate>
+            
+            <!-- Paso 1: Identificación del Votante -->
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                        <h2 class="text-lg font-semibold text-slate-800">Identificación del Docente Votante</h2>
+                    </div>
+                    <span class="text-xs font-medium text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-md">Obligatorio</span>
+                </div>
+                <div class="p-6">
+                    <label for="voter-input" class="block text-sm font-medium text-slate-700 mb-2">
+                        Nombre completo o Correo Institucional
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i data-lucide="user-check" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                        <input type="text" id="voter-input" required
+                            placeholder="Ej. Mtro. Juan Pérez / juan.perez@institucion.edu.mx"
+                            class="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-colors">
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">
+                        Este dato se utiliza únicamente para validar el padrón de miembros de la academia y evitar duplicidad de votos.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Paso 2: Elección de Presidente de Academia -->
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-800">Presidente de Academia</h2>
+                            <p class="text-xs text-slate-500">Selecciona un (1) candidato para ocupar la Presidencia</p>
+                        </div>
+                    </div>
+                    <span id="president-badge" class="text-xs font-medium text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-md">Sin seleccionar</span>
+                </div>
+                <div id="president-options" class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <!-- Las tarjetas de candidatos se generan dinámicamente con JS -->
+                </div>
+            </section>
+
+            <!-- Paso 3: Elección de Secretario de Academia -->
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-800">Secretario de Academia</h2>
+                            <p class="text-xs text-slate-500">Selecciona un (1) candidato diferente para ocupar la Secretaría</p>
+                        </div>
+                    </div>
+                    <span id="secretary-badge" class="text-xs font-medium text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-md">Sin seleccionar</span>
+                </div>
+                <div id="secretary-options" class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <!-- Las tarjetas de candidatos se generan dinámicamente con JS -->
+                </div>
+            </section>
+
+            <!-- Botón de Envío -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-slate-600 text-center sm:text-left">
+                    <p class="font-medium text-slate-800">¿Listo para emitir tu voto?</p>
+                    <p class="text-xs text-slate-500">Verifica tus elecciones antes de confirmar. Una vez enviado no podrá modificarse.</p>
+                </div>
+                <button type="submit" id="submit-btn"
+                    class="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                    <span>Emitir Voto Oficial</span>
+                </button>
+            </div>
+
+        </form>
+    </main>
+
+    <!-- Modal de Confirmación (Reemplaza al confirm() nativo para mejor estética) -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform transition-all">
+            <div class="flex items-center gap-3 text-blue-600 mb-4">
+                <div class="p-2.5 bg-blue-50 rounded-xl">
+                    <i data-lucide="shield-check" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900">Confirmar Votación</h3>
+            </div>
+            <p class="text-sm text-slate-600 mb-4">
+                Por favor confirma que los siguientes datos son correctos antes de registrar tu boleta en el sistema:
+            </p>
+            <div class="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200 text-sm mb-6">
+                <div>
+                    <span class="text-xs text-slate-400 block">Votante:</span>
+                    <span id="modal-voter" class="font-semibold text-slate-800"></span>
+                </div>
+                <div class="border-t border-slate-200 pt-2">
+                    <span class="text-xs text-slate-400 block">Presidente de Academia:</span>
+                    <span id="modal-president" class="font-semibold text-blue-700"></span>
+                </div>
+                <div class="border-t border-slate-200 pt-2">
+                    <span class="text-xs text-slate-400 block">Secretario de Academia:</span>
+                    <span id="modal-secretary" class="font-semibold text-blue-700"></span>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3">
+                <button type="button" onclick="closeConfirmModal()"
+                    class="px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                    Corregir
+                </button>
+                <button type="button" id="confirm-send-btn" onclick="executeVoteSubmission()"
+                    class="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-colors flex items-center gap-2">
+                    <span>Confirmar y Enviar</span>
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie de Página -->
+    <footer class="bg-white border-t border-slate-200 py-6 mt-12">
+        <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+            <p>Sistema de Votación Electrónica de Academia &bull; Conectado con Google Workspace</p>
+            <a href="https://docs.google.com/spreadsheets/d/1v973mOlXjy-OhzWdW5_ssRcAFKYS0gL7A1GlU01wqS8/edit?usp=sharing" 
+               target="_blank" rel="noopener noreferrer" 
+               class="text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1">
+                <i data-lucide="table" class="w-3.5 h-3.5"></i>
+                <span>Ver hoja de resultados</span>
+            </a>
+        </div>
+    </footer>
+
+    <!-- Lógica de la Aplicación -->
+    <script>
+        // Inicializar iconos de Lucide
+        lucide.createIcons();
+
+        // Referencias al DOM
+        const presidentContainer = document.getElementById('president-options');
+        const secretaryContainer = document.getElementById('secretary-options');
+        const votingForm = document.getElementById('voting-form');
+        const alreadyVotedScreen = document.getElementById('already-voted-screen');
+        const demoBanner = document.getElementById('demo-banner');
+
+        // Generar iniciales para el avatar de cada candidato
+        function getInitials(name) {
+            const parts = name.trim().split(' ');
+            if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+            return (parts[0][0] + parts[parts.length - 2][0]).toUpperCase();
+        }
+
+        // Renderizar opciones de candidatos para un cargo específico
+        function renderCandidateOptions(container, roleName) {
+            container.innerHTML = '';
+            GOOGLE_FORM_CONFIG.candidates.forEach((candidate, index) => {
+                const inputId = `${roleName}-cand-${index}`;
+                const initials = getInitials(candidate);
+                
+                const wrapper = document.createElement('label');
+                wrapper.setAttribute('for', inputId);
+                wrapper.className = 'relative cursor-pointer block select-none';
+
+                wrapper.innerHTML = `
+                    <input type="radio" id="${inputId}" name="${roleName}" value="${candidate}" class="sr-only" onchange="handleSelectionChange()">
+                    <div class="candidate-card flex items-center justify-between p-4 rounded-xl border-2 border-slate-200 bg-white hover:border-blue-300">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 font-bold text-sm flex items-center justify-center shrink-0 border border-slate-200">
+                                ${initials}
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-800 text-sm sm:text-base leading-snug">${candidate}</p>
+                                <span class="status-label text-xs text-slate-400">Candidato disponible</span>
+                            </div>
+                        </div>
+                        <div class="check-circle w-6 h-6 rounded-full border-2 border-slate-300 flex items-center justify-center shrink-0 transition-colors">
+                            <i data-lucide="check" class="check-icon w-3.5 h-3.5 text-white opacity-0 transform scale-50 transition-all"></i>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(wrapper);
+            });
+            lucide.createIcons();
+        }
+
+        // Evitar que la misma persona sea elegida simultáneamente como Presidente y Secretario
+        function handleSelectionChange() {
+            hideError();
+            const selectedPres = document.querySelector('input[name="president"]:checked')?.value || null;
+            const selectedSec = document.querySelector('input[name="secretary"]:checked')?.value || null;
+
+            // Actualizar etiquetas superiores
+            const presBadge = document.getElementById('president-badge');
+            const secBadge = document.getElementById('secretary-badge');
+
+            if (selectedPres) {
+                presBadge.textContent = "Seleccionado";
+                presBadge.className = "text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-md";
+            } else {
+                presBadge.textContent = "Sin seleccionar";
+                presBadge.className = "text-xs font-medium text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-md";
+            }
+
+            if (selectedSec) {
+                secBadge.textContent = "Seleccionado";
+                secBadge.className = "text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-md";
+            } else {
+                secBadge.textContent = "Sin seleccionar";
+                secBadge.className = "text-xs font-medium text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-md";
+            }
+
+            // Bloquear en Secretario al que fue elegido como Presidente
+            document.querySelectorAll('input[name="secretary"]').forEach(radio => {
+                const labelText = radio.parentElement.querySelector('.status-label');
+                if (radio.value === selectedPres) {
+                    radio.disabled = true;
+                    labelText.textContent = "Elegido para Presidente";
+                    labelText.className = "status-label text-xs text-amber-600 font-medium";
+                } else {
+                    radio.disabled = false;
+                    labelText.textContent = "Candidato disponible";
+                    labelText.className = "status-label text-xs text-slate-400";
+                }
+            });
+
+            // Bloquear en Presidente al que fue elegido como Secretario
+            document.querySelectorAll('input[name="president"]').forEach(radio => {
+                const labelText = radio.parentElement.querySelector('.status-label');
+                if (radio.value === selectedSec) {
+                    radio.disabled = true;
+                    labelText.textContent = "Elegido para Secretario";
+                    labelText.className = "status-label text-xs text-amber-600 font-medium";
+                } else {
+                    radio.disabled = false;
+                    labelText.textContent = "Candidato disponible";
+                    labelText.className = "status-label text-xs text-slate-400";
+                }
+            });
+        }
+
+        // Mostrar y ocultar errores
+        function showError(msg) {
+            const toast = document.getElementById('error-toast');
+            document.getElementById('error-message').textContent = msg;
+            toast.classList.remove('hidden');
+            toast.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function hideError() {
+            document.getElementById('error-toast').classList.add('hidden');
+        }
+
+        // Interceptar el envío del formulario para validar y abrir modal de confirmación
+        votingForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            hideError();
+
+            const voter = document.getElementById('voter-input').value.trim();
+            const president = document.querySelector('input[name="president"]:checked')?.value;
+            const secretary = document.querySelector('input[name="secretary"]:checked')?.value;
+
+            if (!voter) {
+                showError("Por favor ingresa tu nombre completo o correo institucional.");
+                document.getElementById('voter-input').focus();
+                return;
+            }
+            if (!president) {
+                showError("Por favor selecciona un candidato para Presidente de Academia.");
+                return;
+            }
+            if (!secretary) {
+                showError("Por favor selecciona un candidato para Secretario de Academia.");
+                return;
+            }
+            if (president === secretary) {
+                showError("No puedes elegir a la misma persona para Presidente y Secretario.");
+                return;
+            }
+
+            // Llenar datos del modal de confirmación
+            document.getElementById('modal-voter').textContent = voter;
+            document.getElementById('modal-president').textContent = president;
+            document.getElementById('modal-secretary').textContent = secretary;
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        });
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        }
+
+        // Enviar los datos reales hacia Google Forms
+        async function executeVoteSubmission() {
+            const btn = document.getElementById('confirm-send-btn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Enviando...</span>`;
+            lucide.createIcons();
+
+            const voter = document.getElementById('voter-input').value.trim();
+            const president = document.querySelector('input[name="president"]:checked').value;
+            const secretary = document.querySelector('input[name="secretary"]:checked').value;
+
+            const isConfigured = GOOGLE_FORM_CONFIG.formActionUrl && !GOOGLE_FORM_CONFIG.formActionUrl.includes("TU_URL_DE_GOOGLE_FORM");
+
+            try {
+                if (isConfigured) {
+                    // Construir los parámetros exactamente como los espera Google Forms
+                    const formData = new URLSearchParams();
+                    formData.append(GOOGLE_FORM_CONFIG.entries.voterId, voter);
+                    formData.append(GOOGLE_FORM_CONFIG.entries.president, president);
+                    formData.append(GOOGLE_FORM_CONFIG.entries.secretary, secretary);
+
+                    // Enviar mediante fetch en modo 'no-cors' (estándar para Google Forms desde frontend estático)
+                    await fetch(GOOGLE_FORM_CONFIG.formActionUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: formData.toString()
+                    });
+                } else {
+                    // Simulación de espera si aún no se conecta el Google Form
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                }
+
+                // Guardar comprobante en el navegador
+                const receiptData = { voter, president, secretary, timestamp: new Date().toISOString() };
+                if (GOOGLE_FORM_CONFIG.preventDuplicateVotes) {
+                    localStorage.setItem('academia_vote_submitted', JSON.stringify(receiptData));
+                }
+
+                closeConfirmModal();
+                showSuccessScreen(receiptData);
+
+            } catch (error) {
+                console.error("Error al enviar voto:", error);
+                closeConfirmModal();
+                showError("Ocurrió un problema de conexión al enviar tu voto. Por favor intenta de nuevo.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function showSuccessScreen(data) {
+            votingForm.classList.add('hidden');
+            alreadyVotedScreen.classList.remove('hidden');
+            document.getElementById('receipt-voter').textContent = data.voter;
+            document.getElementById('receipt-president').textContent = data.president;
+            document.getElementById('receipt-secretary').textContent = data.secretary;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetVoteForTesting() {
+            localStorage.removeItem('academia_vote_submitted');
+            votingForm.reset();
+            handleSelectionChange();
+            alreadyVotedScreen.classList.add('hidden');
+            votingForm.classList.remove('hidden');
+        }
+
+        // Inicialización al cargar la página
+        window.addEventListener('DOMContentLoaded', () => {
+            renderCandidateOptions(presidentContainer, 'president');
+            renderCandidateOptions(secretaryContainer, 'secretary');
+
+            // Mostrar aviso si aún no se configura la URL de Google Forms
+            if (GOOGLE_FORM_CONFIG.formActionUrl.includes("TU_URL_DE_GOOGLE_FORM")) {
+                demoBanner.classList.remove('hidden');
+            }
+
+            // Verificar si el usuario ya votó previamente en este dispositivo
+            if (GOOGLE_FORM_CONFIG.preventDuplicateVotes) {
+                const savedVote = localStorage.getItem('academia_vote_submitted');
+                if (savedVote) {
+                    try {
+                        showSuccessScreen(JSON.parse(savedVote));
+                    } catch (e) {
+                        localStorage.removeItem('academia_vote_submitted');
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
